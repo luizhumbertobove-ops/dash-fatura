@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard de Fatura - Cartão de Crédito</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome for icons -->
@@ -49,6 +50,7 @@
             border: 1px solid rgba(220, 210, 190, 0.5);
             box-shadow: 0 10px 30px -5px rgba(180, 170, 150, 0.15);
         }
+        .capitalize-first::first-letter { text-transform: uppercase; }
         .dark-bento {
             background: #1B1B1B;
             color: #F9F6EE;
@@ -128,30 +130,51 @@
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-            <div class="lg:col-span-2 bento-card p-6 rounded-3xl flex flex-col">
-                <div class="flex items-center justify-between mb-5">
+            <div class="lg:col-span-2 bento-card p-4 md:p-6 rounded-3xl flex flex-col min-w-0">
+                <div class="flex items-center justify-between gap-3 mb-4">
                     <div>
                         <h3 class="text-lg font-bold text-stone-900">Lançamentos da Fatura</h3>
-                        <p class="text-xs text-stone-500">Selecione quem participa de cada item. O valor é dividido igualmente entre os selecionados.</p>
+                        <p class="text-xs text-stone-500">Toque nas iniciais para escolher quem divide cada item.</p>
                     </div>
-                    <button onclick="abrirModalNovoItem()" class="bg-stone-900 hover:bg-stone-800 text-cream-50 text-xs font-semibold px-4 py-2.5 rounded-2xl transition flex items-center gap-2 shadow-md">
-                        <i class="fa-solid fa-plus"></i> Novo Item
+                    <button onclick="abrirModalNovoItem()" class="shrink-0 bg-stone-900 hover:bg-stone-800 text-cream-50 text-xs font-semibold px-4 py-2.5 rounded-2xl transition flex items-center gap-2 shadow-md">
+                        <i class="fa-solid fa-plus"></i> <span class="hidden sm:inline">Novo Item</span>
                     </button>
                 </div>
 
-                <div class="overflow-x-auto flex-1">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="border-b border-stone-200 text-stone-400 text-[11px] uppercase tracking-wider font-semibold">
-                                <th class="py-3 px-3">Descrição / Estabelecimento</th>
-                                <th class="py-3 px-3">Valor</th>
-                                <th class="py-3 px-3">Rateio</th>
-                                <th class="py-3 px-3 text-right">Ação</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tabelaLancamentosBody" class="divide-y divide-stone-100 text-xs"></tbody>
-                    </table>
+                <!-- Busca, filtro e ordenação -->
+                <div class="flex flex-col sm:flex-row gap-2 mb-3">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400 text-xs"></i>
+                        <input id="filtroTexto" type="search" placeholder="Buscar estabelecimento ou categoria..." oninput="definirFiltro('texto', this.value)"
+                            class="w-full bg-white border border-stone-200 rounded-2xl pl-9 pr-3 py-2 text-xs text-stone-800 focus:outline-none focus:ring-2 focus:ring-amberSoft-500">
+                    </div>
+                    <div class="flex gap-2">
+                        <select id="filtroPessoa" onchange="definirFiltro('pessoa', this.value)"
+                            class="flex-1 sm:flex-none bg-white border border-stone-200 rounded-2xl px-3 py-2 text-xs font-semibold text-stone-700 focus:outline-none focus:ring-2 focus:ring-amberSoft-500"></select>
+                        <div id="ordemBotoes" class="flex bg-stone-100 rounded-2xl p-1 text-[11px] font-semibold"></div>
+                    </div>
                 </div>
+
+                <!-- Barra de ações em lote -->
+                <div id="barraLote" class="hidden mb-3 bg-stone-900 text-cream-50 rounded-2xl px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+                    <span id="loteContagem" class="font-bold"></span>
+                    <span class="text-stone-400">Dividir com:</span>
+                    <div id="loteBotoes" class="flex flex-wrap gap-1.5"></div>
+                    <button onclick="limparSelecao()" class="ml-auto text-stone-400 hover:text-white"><i class="fa-solid fa-xmark mr-1"></i>Cancelar</button>
+                </div>
+
+                <!-- Cabeçalho da lista -->
+                <div class="flex items-center gap-3 px-2 pb-2 border-b border-stone-200 text-[10px] uppercase tracking-wider font-semibold text-stone-400">
+                    <input type="checkbox" id="selecionarTodos" onchange="selecionarTodosVisiveis(this.checked)" class="accent-amber-600" title="Selecionar todos os itens visíveis">
+                    <span class="flex-1 sm:pl-12">Estabelecimento</span>
+                    <span class="hidden sm:block w-28 text-center">Quem divide</span>
+                    <span class="w-20 sm:w-24 text-right">Valor</span>
+                    <span class="w-6"></span>
+                </div>
+
+                <div id="listaLancamentos" class="flex-1 overflow-y-auto max-h-[70vh] -mx-1 px-1"></div>
+
+                <div id="rodapeLista" class="pt-3 mt-1 border-t border-stone-200 flex items-center justify-between text-[11px] text-stone-500 font-medium"></div>
             </div>
 
             <div class="bento-card p-6 rounded-3xl flex flex-col justify-between dark-bento">
@@ -327,14 +350,6 @@
             return partes;
         }
 
-        // Linha pequena abaixo da descrição: "05/09 · final 3162 · ALIMENTAÇÃO"
-        function detalhesItem(item) {
-            const partes = [item.data, item.cartao && `final ${item.cartao}`, item.categoria].filter(Boolean);
-            return partes.length
-                ? `<span class="block text-[10px] text-stone-400 font-medium">${escaparHtml(partes.join(" · "))}</span>`
-                : "";
-        }
-
         function atualizarDashboard() {
             const [ano, mes] = mesAtual.split("-").map(Number);
             document.getElementById("tituloFatura").innerText = `Fatura de ${NOMES_MESES[mes - 1]} / ${ano}`;
@@ -343,55 +358,201 @@
             calcularResumos();
         }
 
-        function renderizarTabela() {
-            const tbody = document.getElementById("tabelaLancamentosBody");
-            tbody.innerHTML = "";
+        // ---------- Lista de lançamentos ----------
 
-            if (lancamentos.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-stone-400">Nenhum lançamento cadastrado neste mês.</td></tr>`;
-                return;
-            }
+        const CORES_PESSOAS = ["#D99B26", "#2F8F83", "#6366F1", "#DB5A6B", "#0EA5E9", "#84A33A"];
+        const filtros = { texto: "", pessoa: "todos", ordem: "data" };
+        const selecionados = new Set();
 
-            lancamentos.forEach((item) => {
-                const tr = document.createElement("tr");
-                tr.className = "hover:bg-stone-50/80 transition";
+        function corPessoa(p) {
+            return CORES_PESSOAS[pessoas.indexOf(p) % CORES_PESSOAS.length];
+        }
 
-                const qtd = item.pagantes.length;
-                const parte = qtd > 0 ? item.valor / qtd : 0;
+        function iniciais(p) {
+            return p.slice(0, 2).toUpperCase();
+        }
 
-                let html = `<td class="py-3 px-3 font-semibold text-stone-800">
-                    ${escaparHtml(item.desc)}
-                    ${detalhesItem(item)}
-                </td>`;
+        function semAcentos(texto) {
+            return String(texto).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        }
 
-                html += `<td class="py-3 px-3 font-bold text-stone-900">
-                    ${formatarMoeda(item.valor)}
-                    ${qtd > 1 ? `<span class="block text-[10px] text-stone-400 font-medium">${formatarMoeda(parte)} c/ (÷${qtd})</span>` : ""}
-                </td>`;
+        // Ícone pela categoria do banco ou, sem ela, por palavras da descrição
+        function iconeItem(item) {
+            const base = semAcentos(`${item.categoria} ${item.desc}`);
+            const regras = [
+                [/posto|combust|shell|ipiranga/, "fa-gas-pump"],
+                [/veiculo|auto|toyo|motor/, "fa-car"],
+                [/uber|99app|taxi/, "fa-car-side"],
+                [/supermerc|mercado|atacad|assai|lojao|eldi/, "fa-cart-shopping"],
+                [/farma|droga|saude|odonto|microbio|clinica|hospital/, "fa-briefcase-medical"],
+                [/pet/, "fa-paw"],
+                [/bebid|bar |cervej/, "fa-wine-bottle"],
+                [/pizza|restaur|lanch|ifood|aliment/, "fa-utensils"],
+                [/claro|vivo|tim |netflix|spotify|internet/, "fa-wifi"],
+                [/magazine|amazon|mercadoliv|shopee|loja/, "fa-bag-shopping"],
+            ];
+            const achado = regras.find(([re]) => re.test(base));
+            return achado ? achado[1] : "fa-receipt";
+        }
 
-                html += `<td class="py-3 px-3"><div class="flex flex-wrap gap-1.5">`;
-                pessoas.forEach((p, idx) => {
-                    const ativo = item.pagantes.includes(p);
-                    html += `
-                        <button onclick="togglePagante(${item.id}, ${idx})" class="px-2.5 py-1 rounded-xl text-[11px] font-semibold transition border ${
-                            ativo
-                            ? 'bg-amberSoft-500 text-white border-amberSoft-600 shadow-sm'
-                            : 'bg-white text-stone-500 border-stone-200 hover:border-stone-400'
-                        }">
-                            ${escaparHtml(p)} ${ativo ? '<i class="fa-solid fa-check ml-1 text-[9px]"></i>' : ''}
-                        </button>`;
-                });
-                html += `</div></td>`;
+        function itensFiltrados() {
+            const termo = semAcentos(filtros.texto.trim());
+            let lista = lancamentos.filter(item => {
+                if (termo && !semAcentos(`${item.desc} ${item.categoria} ${item.cartao}`).includes(termo)) return false;
+                if (filtros.pessoa === "compartilhados") return item.pagantes.length > 1;
+                if (filtros.pessoa !== "todos") return item.pagantes.includes(filtros.pessoa);
+                return true;
+            });
 
-                html += `<td class="py-3 px-3 text-right">
-                    <button onclick="removerItem(${item.id})" class="text-stone-400 hover:text-red-600 p-1.5 transition rounded-lg hover:bg-red-50" title="Excluir item">
+            // "05/09" -> 0905 para ordenar por data
+            const chaveData = d => { const [dd, mm] = (d || "").split("/"); return Number(`${mm || 0}${dd || 0}`); };
+            if (filtros.ordem === "valor") lista.sort((a, b) => b.valor - a.valor);
+            else if (filtros.ordem === "categoria") lista.sort((a, b) =>
+                (!a.categoria - !b.categoria) || (a.categoria || "").localeCompare(b.categoria || "") || b.valor - a.valor);
+            else lista.sort((a, b) => chaveData(a.data) - chaveData(b.data) || a.id - b.id);
+            return lista;
+        }
+
+        function definirFiltro(campo, valor) {
+            filtros[campo] = valor;
+            renderizarTabela();
+        }
+
+        function renderizarControles() {
+            const select = document.getElementById("filtroPessoa");
+            const opcoes = [["todos", "Todos os itens"], ["compartilhados", "Só divididos"],
+                ...pessoas.map(p => [p, `Com ${p}`])];
+            select.innerHTML = opcoes.map(([v, t]) =>
+                `<option value="${escaparHtml(v)}" ${filtros.pessoa === v ? "selected" : ""}>${escaparHtml(t)}</option>`).join("");
+
+            const ordens = [["data", "Data"], ["valor", "Valor"], ["categoria", "Categoria"]];
+            document.getElementById("ordemBotoes").innerHTML = ordens.map(([v, t]) => `
+                <button onclick="definirFiltro('ordem', '${v}')" class="px-3 py-1 rounded-xl transition ${
+                    filtros.ordem === v ? "bg-white text-stone-900 shadow-sm" : "text-stone-500 hover:text-stone-800"}">${t}</button>`).join("");
+        }
+
+        function avataresItem(item) {
+            return pessoas.map((p, idx) => {
+                const ativo = item.pagantes.includes(p);
+                const estilo = ativo ? `background:${corPessoa(p)};border-color:${corPessoa(p)};color:#fff` : "";
+                return `<button onclick="togglePagante(${item.id}, ${idx})" title="${escaparHtml(p)}${ativo ? " (dividindo)" : ""}" style="${estilo}"
+                    class="w-7 h-7 rounded-full text-[10px] font-bold border-2 transition ${
+                        ativo ? "shadow-sm" : "border-dashed border-stone-300 text-stone-400 bg-white hover:border-stone-500 hover:text-stone-700"}">${escaparHtml(iniciais(p))}</button>`;
+            }).join("");
+        }
+
+        function linhaItem(item) {
+            const qtd = item.pagantes.length;
+            const marcado = selecionados.has(item.id);
+            const parcela = item.desc.match(/\((\d{2}\/\d{2})\)$/);
+            const desc = parcela ? item.desc.slice(0, parcela.index).trim() : item.desc;
+            const meta = [item.data, item.cartao && `final ${item.cartao}`, item.categoria && item.categoria.toLowerCase()].filter(Boolean).join(" · ");
+
+            return `
+                <div class="group flex items-center gap-3 px-2 py-2.5 rounded-2xl transition ${marcado ? "bg-amberSoft-light" : "hover:bg-stone-50"}">
+                    <input type="checkbox" ${marcado ? "checked" : ""} onchange="alternarSelecao(${item.id}, this.checked)" class="accent-amber-600 shrink-0">
+                    <div class="hidden sm:flex w-9 h-9 shrink-0 rounded-2xl bg-stone-100 text-stone-500 items-center justify-center">
+                        <i class="fa-solid ${iconeItem(item)} text-sm"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-start sm:items-center gap-1.5">
+                            <span class="font-semibold text-stone-800 text-xs break-words sm:truncate">${escaparHtml(desc)}</span>
+                            ${parcela ? `<span class="shrink-0 text-[9px] font-bold bg-stone-200 text-stone-600 px-1.5 py-0.5 rounded-md">${parcela[1]}</span>` : ""}
+                        </div>
+                        <div class="text-[10px] text-stone-400 font-medium truncate capitalize-first">${escaparHtml(meta)}</div>
+                        <div class="flex sm:hidden gap-1 mt-1.5">${avataresItem(item)}</div>
+                    </div>
+                    <div class="hidden sm:flex w-28 justify-center gap-1">${avataresItem(item)}</div>
+                    <div class="w-20 sm:w-24 text-right shrink-0">
+                        <div class="font-bold text-xs ${item.valor < 0 ? "text-emerald-600" : "text-stone-900"}">${formatarMoeda(item.valor)}</div>
+                        ${qtd > 1 ? `<div class="text-[10px] text-stone-400 font-medium">${formatarMoeda(item.valor / qtd)} c/</div>` : ""}
+                    </div>
+                    <button onclick="removerItem(${item.id})" title="Excluir item"
+                        class="w-6 shrink-0 text-stone-300 hover:text-red-600 sm:opacity-0 group-hover:opacity-100 transition">
                         <i class="fa-regular fa-trash-can"></i>
                     </button>
-                </td>`;
+                </div>`;
+        }
 
-                tr.innerHTML = html;
-                tbody.appendChild(tr);
+        function renderizarTabela() {
+            renderizarControles();
+            const container = document.getElementById("listaLancamentos");
+            const lista = itensFiltrados();
+
+            // Remove da seleção o que não existe mais
+            [...selecionados].forEach(id => { if (!lancamentos.some(l => l.id === id)) selecionados.delete(id); });
+
+            if (lancamentos.length === 0) {
+                container.innerHTML = `<div class="text-center py-12 text-stone-400 text-xs">
+                    <i class="fa-regular fa-folder-open text-2xl mb-2 block"></i>Nenhum lançamento neste mês.<br>Importe a fatura ou adicione um item.</div>`;
+            } else if (lista.length === 0) {
+                container.innerHTML = `<div class="text-center py-12 text-stone-400 text-xs">Nenhum item encontrado com esses filtros.</div>`;
+            } else if (filtros.ordem === "categoria") {
+                // Agrupa por categoria com subtotal
+                const grupos = new Map();
+                lista.forEach(i => {
+                    const cat = i.categoria || "Sem categoria";
+                    if (!grupos.has(cat)) grupos.set(cat, []);
+                    grupos.get(cat).push(i);
+                });
+                container.innerHTML = [...grupos].map(([cat, itens]) => `
+                    <div class="sticky top-0 z-10 bg-white/95 backdrop-blur flex justify-between items-center px-2 pt-3 pb-1.5 text-[10px] uppercase tracking-wider font-bold text-stone-500">
+                        <span>${escaparHtml(cat)} <span class="text-stone-400 font-semibold">· ${itens.length}</span></span>
+                        <span>${formatarMoeda(itens.reduce((s, i) => s + i.valor, 0))}</span>
+                    </div>
+                    ${itens.map(linhaItem).join("")}`).join("");
+            } else {
+                container.innerHTML = `<div class="divide-y divide-stone-100">${lista.map(linhaItem).join("")}</div>`;
+            }
+
+            const totalFiltrado = lista.reduce((s, i) => s + i.valor, 0);
+            document.getElementById("rodapeLista").innerHTML = lancamentos.length === 0 ? "" : `
+                <span>${lista.length === lancamentos.length ? `${lista.length} itens` : `${lista.length} de ${lancamentos.length} itens`}</span>
+                <span>Total exibido: <b class="text-stone-900">${formatarMoeda(totalFiltrado)}</b></span>`;
+
+            const todos = document.getElementById("selecionarTodos");
+            todos.checked = lista.length > 0 && lista.every(i => selecionados.has(i.id));
+            todos.indeterminate = !todos.checked && lista.some(i => selecionados.has(i.id));
+            renderizarBarraLote();
+        }
+
+        // ---------- Seleção e atribuição em lote ----------
+
+        function alternarSelecao(id, marcado) {
+            marcado ? selecionados.add(id) : selecionados.delete(id);
+            renderizarTabela();
+        }
+
+        function selecionarTodosVisiveis(marcado) {
+            itensFiltrados().forEach(i => marcado ? selecionados.add(i.id) : selecionados.delete(i.id));
+            renderizarTabela();
+        }
+
+        function limparSelecao() {
+            selecionados.clear();
+            renderizarTabela();
+        }
+
+        function renderizarBarraLote() {
+            const barra = document.getElementById("barraLote");
+            barra.classList.toggle("hidden", selecionados.size === 0);
+            if (selecionados.size === 0) return;
+
+            document.getElementById("loteContagem").innerText =
+                `${selecionados.size} ${selecionados.size === 1 ? "item selecionado" : "itens selecionados"}`;
+            const botoes = pessoas.map(p => [JSON.stringify([p]), p, corPessoa(p)]);
+            if (pessoas.length > 1) botoes.push([JSON.stringify(pessoas), "Todos", "#57534e"]);
+            document.getElementById("loteBotoes").innerHTML = botoes.map(([lista, rotulo, cor]) => `
+                <button onclick='atribuirLote(${escaparHtml(lista)})' class="px-3 py-1 rounded-xl font-semibold text-white hover:opacity-90" style="background:${cor}">${escaparHtml(rotulo)}</button>`).join("");
+        }
+
+        function atribuirLote(novosPagantes) {
+            lancamentos.forEach(item => {
+                if (selecionados.has(item.id)) item.pagantes = [...novosPagantes];
             });
+            selecionados.clear();
+            salvarLocalStorage();
+            atualizarDashboard();
         }
 
         function togglePagante(id, idxPessoa) {
@@ -486,6 +647,7 @@
 
         async function carregarMes(mes) {
             mesAtual = mes;
+            selecionados.clear();
             const origem = document.getElementById("origemDados");
 
             // 1) Edições salvas neste navegador têm prioridade
