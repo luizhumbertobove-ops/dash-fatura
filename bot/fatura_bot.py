@@ -77,25 +77,91 @@ def normalizar_data(texto: str) -> str:
 # ---------------------------------------------------------------- leitores
 
 
-def ler_pdf(caminho: Path) -> list[dict]:
+RE_CARTAO = re.compile(r"\(final (\d{4})\)")
+RE_PARCELA = re.compile(r"\s*(\d{2}/\d{2})$")
+RE_CATEGORIA = re.compile(r"^([A-ZÀ-Ú][A-ZÀ-Ú ]+?)\s*\.")
+RE_VENCIMENTO = re.compile(r"vencimento:?\s*(\d{2})/(\d{2})/(\d{4})", re.IGNORECASE)
+RE_TOTAL = re.compile(r"total dos lan[cç]amentos atuais\s+([\d.]+,\d{2})", re.IGNORECASE)
+
+# Seções que encerram/reabrem a leitura de lançamentos (texto já sem acentos)
+INICIO_SECAO = ("lancamentos: compras e saques", "lancamentos: produtos e servicos",
+                "lancamentos internacionais")
+FIM_SECAO = ("compras parceladas - proximas faturas",)
+
+
+def textos_do_pdf(pdf) -> list[str]:
+    """Devolve os blocos de texto na ordem de leitura.
+
+    A fatura do Itaú tem duas colunas de lançamentos lado a lado; lendo a
+    página inteira, cada linha misturaria duas compras. Nesse caso cada
+    página é lida como coluna esquerda e depois coluna direita.
+    """
+    paginas = [pg.extract_text() or "" for pg in pdf.pages]
+    duas_colunas = any("compras e saques" in sem_acentos(t) for t in paginas)
+    if not duas_colunas:
+        return paginas
+
+    blocos = []
+    for pg in pdf.pages:
+        meio = pg.width * 0.588
+        blocos.append(pg.within_bbox((0, 0, meio, pg.height)).extract_text() or "")
+        blocos.append(pg.within_bbox((meio, 0, pg.width, pg.height)).extract_text() or "")
+    return blocos
+
+
+def ler_pdf(caminho: Path) -> tuple[list[dict], dict]:
     try:
         import pdfplumber
     except ImportError:
         sys.exit("Instale as dependências: pip install -r bot/requirements.txt")
 
-    itens = []
+    itens: list[dict] = []
+    info: dict = {}
     with pdfplumber.open(caminho) as pdf:
-        for pagina in pdf.pages:
-            for linha in (pagina.extract_text() or "").splitlines():
-                m = RE_LINHA_PDF.match(linha.strip())
-                if not m:
+        blocos = textos_do_pdf(pdf)
+
+    texto_completo = "\n".join(blocos)
+    if m := RE_VENCIMENTO.search(texto_completo):
+        info["mes"] = f"{m.group(3)}-{m.group(2)}"
+    if m := RE_TOTAL.search(texto_completo):
+        info["total"] = para_numero(m.group(1))
+
+    lendo = True
+    cartao = ""
+    for bloco in blocos:
+        for linha in bloco.splitlines():
+            linha = linha.strip()
+            norm = sem_acentos(linha)
+            if any(t in norm for t in FIM_SECAO):
+                lendo = False
+                continue
+            if any(t in norm for t in INICIO_SECAO):
+                lendo = True
+                continue
+            if (m := RE_CARTAO.search(linha)) and "lancamentos no cartao" not in norm:
+                cartao = m.group(1)
+                continue
+
+            m = RE_LINHA_PDF.match(linha)
+            if m:
+                if not lendo:
                     continue
+                desc = re.sub(r"\s{2,}", " ", m.group("desc")).strip()
+                parcela = RE_PARCELA.search(desc)
+                if parcela:
+                    desc = f"{desc[:parcela.start()].strip()} ({parcela.group(1)})"
                 itens.append({
                     "data": normalizar_data(m.group("data")),
-                    "desc": re.sub(r"\s{2,}", " ", m.group("desc")).strip(),
+                    "desc": desc,
                     "valor": para_numero(m.group("valor")),
+                    "cartao": cartao,
+                    "categoria": "",
                 })
-    return itens
+            elif itens and lendo and not itens[-1]["categoria"]:
+                # Linha logo abaixo da compra: "ALIMENTAÇÃO .SERRANA"
+                if c := RE_CATEGORIA.match(linha):
+                    itens[-1]["categoria"] = c.group(1).strip()
+    return itens, info
 
 
 COLUNAS_DATA = ("data", "date", "data da compra", "data lancamento")
@@ -114,7 +180,7 @@ def achar_coluna(cabecalho: list[str], candidatos: tuple[str, ...]) -> int | Non
     return None
 
 
-def ler_csv(caminho: Path) -> list[dict]:
+def ler_csv(caminho: Path) -> tuple[list[dict], dict]:
     bruto = caminho.read_bytes()
     for codificacao in ("utf-8-sig", "latin-1"):
         try:
@@ -143,11 +209,24 @@ def ler_csv(caminho: Path) -> list[dict]:
             "data": normalizar_data(linha[i_data]) if i_data is not None else "",
             "desc": linha[i_desc].strip(),
             "valor": para_numero(linha[i_valor]),
+            "cartao": "",
+            "categoria": "",
         })
-    return itens
+    return itens, {}
 
 
 # ---------------------------------------------------------------- regras
+
+
+def regra_combina(regra: dict, item: dict) -> bool:
+    """Todas as condições presentes na regra precisam bater."""
+    if "contem" in regra and sem_acentos(regra["contem"]) not in sem_acentos(item["desc"]):
+        return False
+    if "cartao" in regra and str(regra["cartao"]) != item.get("cartao", ""):
+        return False
+    if "categoria" in regra and sem_acentos(regra["categoria"]) != sem_acentos(item.get("categoria", "")):
+        return False
+    return any(k in regra for k in ("contem", "cartao", "categoria"))
 
 
 def aplicar_regras(itens: list[dict], config: dict) -> list[dict]:
@@ -157,39 +236,47 @@ def aplicar_regras(itens: list[dict], config: dict) -> list[dict]:
 
     lancamentos = []
     for item in itens:
-        desc_norm = sem_acentos(item["desc"])
-        if any(t in desc_norm for t in ignorar) or item["valor"] == 0:
+        if any(t in sem_acentos(item["desc"]) for t in ignorar) or item["valor"] == 0:
             continue
 
         pagantes = list(pessoas)
         for regra in regras:
-            if sem_acentos(regra["contem"]) in desc_norm:
+            if regra_combina(regra, item):
                 validos = [p for p in regra["pagantes"] if p in pessoas]
                 if validos:
                     pagantes = validos
                 break
 
-        lancamentos.append({
+        lancamento = {
             "id": len(lancamentos) + 1,
             "data": item["data"],
             "desc": item["desc"],
             "valor": round(item["valor"], 2),
             "pagantes": pagantes,
-        })
+        }
+        if item.get("cartao"):
+            lancamento["cartao"] = item["cartao"]
+        if item.get("categoria"):
+            lancamento["categoria"] = item["categoria"]
+        lancamentos.append(lancamento)
     return lancamentos
+
+
+def moeda(valor: float) -> str:
+    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Lê a fatura do cartão e gera os lançamentos do mês.")
     parser.add_argument("arquivo", type=Path, help="Fatura em PDF ou CSV")
-    parser.add_argument("--mes", default=date.today().strftime("%Y-%m"),
-                        help="Mês da fatura no formato AAAA-MM (padrão: mês atual)")
+    parser.add_argument("--mes", help="Mês da fatura no formato AAAA-MM "
+                        "(padrão: mês do vencimento lido no PDF, senão o mês atual)")
     parser.add_argument("--config", type=Path, default=CONFIG_PADRAO, help="Arquivo de configuração")
     parser.add_argument("--sobrescrever", action="store_true", help="Substitui o JSON do mês se já existir")
     parser.add_argument("--stdout", action="store_true", help="Só imprime o JSON, sem gravar arquivo")
     args = parser.parse_args()
 
-    if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", args.mes):
+    if args.mes and not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", args.mes):
         sys.exit("--mes deve estar no formato AAAA-MM, ex.: 2026-10")
     if not args.arquivo.exists():
         sys.exit(f"Arquivo não encontrado: {args.arquivo}")
@@ -198,24 +285,32 @@ def main() -> None:
 
     extensao = args.arquivo.suffix.lower()
     if extensao == ".pdf":
-        itens = ler_pdf(args.arquivo)
+        itens, info = ler_pdf(args.arquivo)
     elif extensao in (".csv", ".txt"):
-        itens = ler_csv(args.arquivo)
+        itens, info = ler_csv(args.arquivo)
     else:
         sys.exit("Formato não suportado. Use PDF ou CSV.")
+
+    mes = args.mes or info.get("mes") or date.today().strftime("%Y-%m")
 
     lancamentos = aplicar_regras(itens, config)
     if not lancamentos:
         sys.exit("Nenhum lançamento encontrado. Confira se o arquivo é a fatura correta.")
 
-    saida = {"mes": args.mes, "lancamentos": lancamentos}
+    # Confere com o total impresso na fatura (soma antes de aplicar "ignorar")
+    lido = round(sum(i["valor"] for i in itens), 2)
+    if "total" in info and abs(lido - info["total"]) > 0.005:
+        print(f"ATENÇÃO: soma lida {moeda(lido)} difere do total da fatura {moeda(info['total'])}. "
+              "Confira os lançamentos.", file=sys.stderr)
+
+    saida = {"mes": mes, "lancamentos": lancamentos}
     texto = json.dumps(saida, ensure_ascii=False, indent=2) + "\n"
 
     if args.stdout:
         sys.stdout.write(texto)
         return
 
-    destino = PASTA_FATURAS / f"{args.mes}.json"
+    destino = PASTA_FATURAS / f"{mes}.json"
     if destino.exists() and not args.sobrescrever:
         sys.exit(f"{destino} já existe. Use --sobrescrever para substituir.")
     destino.parent.mkdir(parents=True, exist_ok=True)
@@ -223,7 +318,7 @@ def main() -> None:
 
     total = sum(l["valor"] for l in lancamentos)
     print(f"{len(lancamentos)} lançamentos gravados em {destino.relative_to(RAIZ)}")
-    print(f"Total da fatura: R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    print(f"Total: {moeda(total)}" + (" (confere com a fatura)" if info.get("total") == round(total, 2) else ""))
 
 
 if __name__ == "__main__":

@@ -21,8 +21,8 @@ e um bot em Python que lê a fatura (PDF ou CSV) e gera os lançamentos do mês.
 ```bash
 pip install -r bot/requirements.txt
 
-# Lê a fatura e grava data/faturas/2026-10.json
-python bot/fatura_bot.py ~/Downloads/fatura-outubro.pdf --mes 2026-10
+# Lê a fatura e grava data/faturas/AAAA-MM.json (mês do vencimento)
+python bot/fatura_bot.py ~/Downloads/Fatura_Itau.pdf
 
 # CSV (ex.: exportação do Nubank: date,title,amount ou "Data;Descrição;Valor")
 python bot/fatura_bot.py ~/Downloads/fatura.csv --mes 2026-10 --sobrescrever
@@ -40,9 +40,24 @@ Depois é só fazer commit e push de `data/faturas/AAAA-MM.json` na `main`; o Pa
 - `regras`: quem divide cada tipo de gasto. A primeira regra cujo `contem` aparecer na
   descrição define os pagantes; sem regra, o item é dividido entre todos.
 
+Cada regra pode usar uma ou mais condições (todas precisam bater):
+
 ```json
 { "contem": "uber", "pagantes": ["Leo"] }
+{ "cartao": "8082", "pagantes": ["Luiz"] }
+{ "categoria": "veículos", "pagantes": ["Luiz", "Beto"] }
 ```
+
+- `contem`: trecho da descrição (sem diferenciar maiúsculas/acentos);
+- `cartao`: 4 últimos dígitos do cartão (a fatura Itaú separa por cartão adicional);
+- `categoria`: categoria impressa pelo banco abaixo da compra (ALIMENTAÇÃO, VEÍCULOS...).
+
+### Fatura Itaú (PDF)
+
+O PDF do Itaú tem os lançamentos em duas colunas; o bot lê cada coluna separadamente,
+guarda o cartão (final XXXX), a categoria e a parcela (ex.: `ToyomotorsService (01/05)`),
+ignora a seção "Compras parceladas - próximas faturas" e confere a soma com o
+"Total dos lançamentos atuais". O mês é detectado pelo vencimento (`--mes` é opcional).
 
 ## Deploy (GitHub Pages)
 

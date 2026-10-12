@@ -297,6 +297,8 @@
             return lista.map((item, i) => ({
                 id: i + 1,
                 data: item.data || "",
+                cartao: item.cartao || "",
+                categoria: item.categoria || "",
                 desc: String(item.desc ?? item.descricao ?? "Sem descrição"),
                 valor: paraNumero(item.valor),
                 pagantes: normalizarPagantes(item.pagantes)
@@ -316,6 +318,14 @@
                 partes.push((base + extra) / 100);
             }
             return partes;
+        }
+
+        // Linha pequena abaixo da descrição: "05/09 · final 3162 · ALIMENTAÇÃO"
+        function detalhesItem(item) {
+            const partes = [item.data, item.cartao && `final ${item.cartao}`, item.categoria].filter(Boolean);
+            return partes.length
+                ? `<span class="block text-[10px] text-stone-400 font-medium">${escaparHtml(partes.join(" · "))}</span>`
+                : "";
         }
 
         function atualizarDashboard() {
@@ -344,7 +354,7 @@
 
                 let html = `<td class="py-3 px-3 font-semibold text-stone-800">
                     ${escaparHtml(item.desc)}
-                    ${item.data ? `<span class="block text-[10px] text-stone-400 font-medium">${escaparHtml(item.data)}</span>` : ""}
+                    ${detalhesItem(item)}
                 </td>`;
 
                 html += `<td class="py-3 px-3 font-bold text-stone-900">
