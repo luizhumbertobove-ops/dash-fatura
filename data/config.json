@@ -1,5 +1,12 @@
 {
-  "pessoas": ["Luiz", "Beto", "Leo"],
+  "pessoas": [
+    "Luiz",
+    "Beto",
+    "Leo"
+  ],
+  "padrao": [
+    "Luiz"
+  ],
   "ignorar": [
     "pagamento recebido",
     "pagamento efetuado",
@@ -8,7 +15,18 @@
     "total da fatura"
   ],
   "regras": [
-    { "contem": "uber", "pagantes": ["Leo"] },
-    { "contem": "posto", "pagantes": ["Luiz", "Beto"] }
+    {
+      "contem": "uber",
+      "pagantes": [
+        "Leo"
+      ]
+    },
+    {
+      "contem": "posto",
+      "pagantes": [
+        "Luiz",
+        "Beto"
+      ]
+    }
   ]
 }

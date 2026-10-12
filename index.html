@@ -225,6 +225,13 @@
     <script>
         // Lista padrão de pessoas (sobrescrita por data/config.json, se existir)
         let pessoas = ["Luiz", "Beto", "Leo"];
+        // Quem fica selecionado quando o item não diz quem paga (config.json: "padrao")
+        let pagantesPadrao = ["Luiz"];
+
+        function padraoValido() {
+            const validos = pagantesPadrao.filter(p => pessoas.includes(p));
+            return validos.length > 0 ? validos : [pessoas[0]];
+        }
 
         const NOMES_MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
             "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -284,13 +291,13 @@
         // Ajusta nomes vindos de JSON ("LUIZ", " luiz ") para os nomes oficiais
         // e descarta quem não está na lista (ex.: pessoas removidas).
         function normalizarPagantes(lista) {
-            if (!Array.isArray(lista)) return [...pessoas];
+            if (!Array.isArray(lista)) return padraoValido();
             const resultado = [];
             lista.forEach(nome => {
                 const oficial = pessoas.find(p => p.toLowerCase() === String(nome).trim().toLowerCase());
                 if (oficial && !resultado.includes(oficial)) resultado.push(oficial);
             });
-            return resultado.length > 0 ? resultado : [...pessoas];
+            return resultado.length > 0 ? resultado : padraoValido();
         }
 
         function normalizarLancamentos(lista) {
@@ -584,7 +591,7 @@
         function abrirModalNovoItem() {
             document.getElementById("checkboxesPessoas").innerHTML = pessoas.map(p => `
                 <label class="flex items-center gap-2 bg-white border border-stone-200 p-2.5 rounded-2xl cursor-pointer hover:border-amberSoft-500">
-                    <input type="checkbox" name="pessoasCheck" value="${escaparHtml(p)}" checked class="accent-amber-600 rounded">
+                    <input type="checkbox" name="pessoasCheck" value="${escaparHtml(p)}" ${padraoValido().includes(p) ? "checked" : ""} class="accent-amber-600 rounded">
                     <span class="text-xs font-medium text-stone-800">${escaparHtml(p)}</span>
                 </label>`).join("");
             document.getElementById("modalNovoItem").classList.remove("hidden");
@@ -628,6 +635,7 @@
                 if (resp.ok) {
                     const config = await resp.json();
                     if (Array.isArray(config.pessoas) && config.pessoas.length > 0) pessoas = config.pessoas;
+                    if (Array.isArray(config.padrao) && config.padrao.length > 0) pagantesPadrao = config.padrao;
                 }
             } catch (e) {
                 // Sem config: usa a lista padrão

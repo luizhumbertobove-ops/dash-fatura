@@ -36,9 +36,10 @@ Depois é só fazer commit e push de `data/faturas/AAAA-MM.json` na `main`; o Pa
 ### Configuração (`data/config.json`)
 
 - `pessoas`: quem participa do rateio.
+- `padrao`: quem fica selecionado quando nenhuma regra se aplica e no "Novo Item" (hoje só o Luiz).
 - `ignorar`: trechos de descrição que não entram (pagamentos da fatura anterior, saldo etc.).
 - `regras`: quem divide cada tipo de gasto. A primeira regra cujo `contem` aparecer na
-  descrição define os pagantes; sem regra, o item é dividido entre todos.
+  descrição define os pagantes; sem regra, o item fica com quem está em `padrao`.
 
 Cada regra pode usar uma ou mais condições (todas precisam bater):
 

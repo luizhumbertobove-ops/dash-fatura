@@ -10,7 +10,7 @@ Uso:
     python bot/fatura_bot.py fatura.pdf --mes 2026-10 --stdout   # só imprime o JSON
 
 Quem divide cada item é decidido pelas "regras" de data/config.json
-(trecho da descrição -> lista de pagantes). Sem regra, divide entre todos.
+(trecho da descrição -> lista de pagantes). Sem regra, usa "padrao" (só o Luiz).
 """
 
 from __future__ import annotations
@@ -231,6 +231,7 @@ def regra_combina(regra: dict, item: dict) -> bool:
 
 def aplicar_regras(itens: list[dict], config: dict) -> list[dict]:
     pessoas = config["pessoas"]
+    padrao = [p for p in config.get("padrao", pessoas) if p in pessoas] or pessoas
     ignorar = [sem_acentos(t) for t in config.get("ignorar", [])]
     regras = config.get("regras", [])
 
@@ -239,7 +240,7 @@ def aplicar_regras(itens: list[dict], config: dict) -> list[dict]:
         if any(t in sem_acentos(item["desc"]) for t in ignorar) or item["valor"] == 0:
             continue
 
-        pagantes = list(pessoas)
+        pagantes = list(padrao)
         for regra in regras:
             if regra_combina(regra, item):
                 validos = [p for p in regra["pagantes"] if p in pessoas]
