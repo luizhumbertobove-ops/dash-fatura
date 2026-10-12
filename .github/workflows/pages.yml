@@ -26,7 +26,7 @@ jobs:
       - name: Monta o site (só HTML e dados, sem o bot)
         run: |
           mkdir _site
-          cp index.html favicon.svg .nojekyll _site/
+          cp index.html favicon.svg leitor-pdf.js .nojekyll _site/
           cp -r data _site/
 
       - uses: actions/configure-pages@v5

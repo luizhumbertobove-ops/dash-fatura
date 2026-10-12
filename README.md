@@ -16,7 +16,16 @@ e um bot em Python que lê a fatura (PDF ou CSV) e gera os lançamentos do mês.
   O botão **Exportar** baixa o JSON do mês, que pode ser commitado em `data/faturas/`
   para ficar disponível em qualquer dispositivo.
 
-## Bot de leitura da fatura
+## Importar a fatura pelo site (recomendado)
+
+Clique em **Importar Fatura (PDF)** e escolha o PDF do Itaú. A leitura roda no próprio
+navegador (`leitor-pdf.js`, com pdf.js): o arquivo não é enviado para lugar nenhum.
+O mês é detectado pelo vencimento, as regras de `data/config.json` são aplicadas e a
+soma é conferida com o total da fatura. Os lançamentos ficam salvos no navegador.
+
+## Bot de leitura da fatura (linha de comando)
+
+Mesma lógica do site, para gerar o JSON e publicar o mês no repositório.
 
 ```bash
 pip install -r bot/requirements.txt
