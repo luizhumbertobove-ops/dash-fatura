@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Fatura - Cartão de Crédito</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cream: {
+                            50: '#FDFBF7',
+                            100: '#F9F6EE',
+                            200: '#F0EBD8',
+                            300: '#E6DEBF',
+                            400: '#D5C9A1',
+                        },
+                        amberSoft: {
+                            500: '#D99B26',
+                            600: '#C2851E',
+                            light: '#FFF9E6'
+                        },
+                        darkCard: '#1E1E1E',
+                        darkText: '#1A1A1A'
+                    },
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #F7F3E8;
+            color: #1A1A1A;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        .bento-card {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(220, 210, 190, 0.5);
+            box-shadow: 0 10px 30px -5px rgba(180, 170, 150, 0.15);
+        }
+        .dark-bento {
+            background: #1B1B1B;
+            color: #F9F6EE;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #D5C9A1; border-radius: 9999px; }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+
+        <header class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bento-card p-5 rounded-3xl">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-amberSoft-500 flex items-center justify-center text-white font-bold shadow-md">
+                    <i class="fa-solid fa-credit-card text-lg"></i>
+                </div>
+                <div>
+                    <span class="text-xs uppercase tracking-wider text-stone-500 font-semibold">Painel Financeiro</span>
+                    <div class="flex items-center gap-2">
+                        <button onclick="mudarMes(-1)" class="text-stone-400 hover:text-stone-800 p-1" title="Mês anterior">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        <h1 id="tituloFatura" class="text-xl md:text-2xl font-bold text-stone-900">Fatura</h1>
+                        <button onclick="mudarMes(1)" class="text-stone-400 hover:text-stone-800 p-1" title="Próximo mês">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+                    <span id="origemDados" class="text-[10px] text-stone-400 font-medium"></span>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+                <button onclick="abrirModalImportarJSON()" class="bg-amberSoft-500 hover:bg-amberSoft-600 text-white text-xs font-bold px-4 py-2.5 rounded-2xl transition flex items-center gap-2 shadow-md">
+                    <i class="fa-solid fa-file-import"></i> Importar (JSON)
+                </button>
+                <button onclick="exportarJSON()" class="bg-stone-200/80 hover:bg-stone-300 text-stone-800 text-xs font-semibold px-4 py-2.5 rounded-2xl transition flex items-center gap-2">
+                    <i class="fa-solid fa-download"></i> Exportar
+                </button>
+                <button onclick="zerarMes()" class="bg-stone-200/80 hover:bg-stone-300 text-stone-800 text-xs font-semibold px-4 py-2.5 rounded-2xl transition flex items-center gap-2">
+                    <i class="fa-solid fa-eraser"></i> Zerar Mês
+                </button>
+                <div class="bg-stone-900 text-cream-50 px-5 py-2.5 rounded-2xl flex items-center gap-3 shadow-lg">
+                    <div class="text-right">
+                        <span class="block text-[10px] uppercase tracking-wider text-stone-400">Total da Fatura</span>
+                        <span id="headerTotalFatura" class="text-lg font-bold text-amber-300">R$ 0,00</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+            <div class="bento-card p-6 rounded-3xl lg:col-span-1 flex flex-col justify-between relative overflow-hidden">
+                <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-amberSoft-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                <div>
+                    <div class="flex items-center gap-2 text-stone-500 text-xs font-semibold mb-2">
+                        <i class="fa-regular fa-sun text-amberSoft-500"></i> <span id="saudacao">Bom dia</span>
+                    </div>
+                    <h2 class="text-2xl font-bold text-stone-900">Olá, Luiz 👋</h2>
+                    <p class="text-xs text-stone-600 mt-2 leading-relaxed">
+                        Gerencie os lançamentos do cartão e distribua os gastos entre o grupo de forma justa e automática.
+                    </p>
+                </div>
+                <div class="mt-6 pt-4 border-t border-stone-200/60 flex items-center justify-between text-xs text-stone-600 font-medium">
+                    <span>Participantes:</span>
+                    <span id="qtdParticipantes" class="bg-stone-200/60 px-2.5 py-1 rounded-full text-stone-900 font-bold">0 Pessoas</span>
+                </div>
+            </div>
+
+            <!-- Métricas por pessoa (geradas a partir da lista de pessoas) -->
+            <div id="metricasContainer" class="lg:col-span-3 grid grid-cols-2 sm:grid-cols-3 gap-4"></div>
+
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <div class="lg:col-span-2 bento-card p-6 rounded-3xl flex flex-col">
+                <div class="flex items-center justify-between mb-5">
+                    <div>
+                        <h3 class="text-lg font-bold text-stone-900">Lançamentos da Fatura</h3>
+                        <p class="text-xs text-stone-500">Selecione quem participa de cada item. O valor é dividido igualmente entre os selecionados.</p>
+                    </div>
+                    <button onclick="abrirModalNovoItem()" class="bg-stone-900 hover:bg-stone-800 text-cream-50 text-xs font-semibold px-4 py-2.5 rounded-2xl transition flex items-center gap-2 shadow-md">
+                        <i class="fa-solid fa-plus"></i> Novo Item
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto flex-1">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-stone-200 text-stone-400 text-[11px] uppercase tracking-wider font-semibold">
+                                <th class="py-3 px-3">Descrição / Estabelecimento</th>
+                                <th class="py-3 px-3">Valor</th>
+                                <th class="py-3 px-3">Rateio</th>
+                                <th class="py-3 px-3 text-right">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaLancamentosBody" class="divide-y divide-stone-100 text-xs"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bento-card p-6 rounded-3xl flex flex-col justify-between dark-bento">
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold text-cream-50">Resumo por Pessoa</h3>
+                        <span id="badgeMes" class="text-xs bg-amberSoft-500 text-stone-900 px-2.5 py-1 rounded-full font-bold"></span>
+                    </div>
+                    <p class="text-xs text-stone-400 mb-6">Detalhamento individual dos gastos com base na divisão dos itens.</p>
+                    <div id="resumoPessoasContainer" class="space-y-4"></div>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-white/10 text-center">
+                    <p class="text-xs text-stone-400">Alterações são salvas automaticamente neste navegador, separadas por mês.</p>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Modal Importar JSON -->
+    <div id="modalImportarJSON" class="fixed inset-0 bg-stone-950/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bento-card bg-cream-50 w-full max-w-lg p-6 rounded-3xl shadow-2xl border border-stone-300">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-stone-900"><i class="fa-solid fa-code text-amberSoft-500 mr-2"></i>Importar Lançamentos (JSON)</h3>
+                <button onclick="fecharModalImportarJSON()" class="text-stone-400 hover:text-stone-700 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <p class="text-xs text-stone-600 mb-3">Cole o JSON gerado pelo bot (<code>bot/fatura_bot.py</code>) ou escolha o arquivo. Os lançamentos substituem os do mês exibido.</p>
+            <input type="file" id="inputArquivoJSON" accept=".json,application/json" class="mb-3 block w-full text-xs text-stone-600 file:mr-3 file:rounded-xl file:border-0 file:bg-stone-200 file:px-3 file:py-1.5 file:text-xs file:font-semibold">
+            <textarea id="inputJSON" rows="10" placeholder='{"mes":"2026-10","lancamentos":[{"desc":"Exemplo","valor":100.0,"pagantes":["Luiz","Beto"]}]}' class="w-full bg-white border border-stone-200 rounded-2xl p-3 text-xs font-mono text-stone-800 focus:outline-none focus:ring-2 focus:ring-amberSoft-500"></textarea>
+            <div class="flex justify-end gap-2 pt-4">
+                <button type="button" onclick="fecharModalImportarJSON()" class="bg-stone-200 text-stone-700 px-4 py-2 rounded-2xl text-xs font-semibold hover:bg-stone-300">Cancelar</button>
+                <button type="button" onclick="processarImportacaoJSON()" class="bg-amberSoft-500 hover:bg-amberSoft-600 text-white px-5 py-2 rounded-2xl text-xs font-semibold shadow-md">Carregar Fatura</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Novo Item -->
+    <div id="modalNovoItem" class="fixed inset-0 bg-stone-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bento-card bg-cream-50 w-full max-w-md p-6 rounded-3xl shadow-2xl border border-stone-300">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-stone-900">Adicionar Novo Lançamento</h3>
+                <button onclick="fecharModalNovoItem()" class="text-stone-400 hover:text-stone-700 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <form id="formNovoItem" onsubmit="adicionarItem(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-stone-700 mb-1">Descrição / Estabelecimento</label>
+                    <input type="text" id="inputDesc" required placeholder="Ex: Assaí Supermercados, Netflix..." class="w-full bg-white border border-stone-200 rounded-2xl px-4 py-2.5 text-xs text-stone-800 focus:outline-none focus:ring-2 focus:ring-amberSoft-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-stone-700 mb-1">Valor total do item (R$)</label>
+                    <input type="number" step="0.01" id="inputValor" required placeholder="0,00" class="w-full bg-white border border-stone-200 rounded-2xl px-4 py-2.5 text-xs text-stone-800 focus:outline-none focus:ring-2 focus:ring-amberSoft-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-stone-700 mb-2">Quem vai dividir?</label>
+                    <div id="checkboxesPessoas" class="grid grid-cols-2 gap-2"></div>
+                </div>
+                <div class="flex justify-end gap-2 pt-3">
+                    <button type="button" onclick="fecharModalNovoItem()" class="bg-stone-200 text-stone-700 px-4 py-2 rounded-2xl text-xs font-semibold hover:bg-stone-300">Cancelar</button>
+                    <button type="submit" class="bg-stone-900 text-cream-50 px-5 py-2 rounded-2xl text-xs font-semibold hover:bg-stone-800">Adicionar Lançamento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Lista padrão de pessoas (sobrescrita por data/config.json, se existir)
+        let pessoas = ["Luiz", "Beto", "Leo"];
+
+        const NOMES_MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+        // Mês exibido no formato "AAAA-MM". Cada mês tem seus próprios lançamentos.
+        let mesAtual = mesDeHoje();
+        let lancamentos = [];
+
+        function mesDeHoje() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        }
+
+        function chaveStorage(mes) {
+            return `fatura_lancamentos_${mes}`;
+        }
+
+        function salvarLocalStorage() {
+            try {
+                localStorage.setItem(chaveStorage(mesAtual), JSON.stringify(lancamentos));
+            } catch (e) {
+                console.warn("Não foi possível salvar no navegador:", e);
+            }
+        }
+
+        function lerLocalStorage(mes) {
+            try {
+                const bruto = localStorage.getItem(chaveStorage(mes));
+                return bruto ? JSON.parse(bruto) : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function escaparHtml(texto) {
+            return String(texto)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function formatarMoeda(valor) {
+            return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        // Aceita número ou texto ("1.234,56", "R$ 45,90", "45.90")
+        function paraNumero(valor) {
+            if (typeof valor === "number") return valor;
+            let s = String(valor ?? "").replace(/[^\d,.\-]/g, "");
+            if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+            const n = parseFloat(s);
+            return isNaN(n) ? 0 : n;
+        }
+
+        // Ajusta nomes vindos de JSON ("LUIZ", " luiz ") para os nomes oficiais
+        // e descarta quem não está na lista (ex.: pessoas removidas).
+        function normalizarPagantes(lista) {
+            if (!Array.isArray(lista)) return [...pessoas];
+            const resultado = [];
+            lista.forEach(nome => {
+                const oficial = pessoas.find(p => p.toLowerCase() === String(nome).trim().toLowerCase());
+                if (oficial && !resultado.includes(oficial)) resultado.push(oficial);
+            });
+            return resultado.length > 0 ? resultado : [...pessoas];
+        }
+
+        function normalizarLancamentos(lista) {
+            return lista.map((item, i) => ({
+                id: i + 1,
+                data: item.data || "",
+                desc: String(item.desc ?? item.descricao ?? "Sem descrição"),
+                valor: paraNumero(item.valor),
+                pagantes: normalizarPagantes(item.pagantes)
+            }));
+        }
+
+        // Divide o valor em centavos entre os pagantes. Os centavos que sobram
+        // vão para os primeiros da lista, para que a soma das partes seja
+        // exatamente igual ao valor do item (nunca o valor cheio para cada um).
+        function dividirValor(valor, qtd) {
+            const totalCentavos = Math.round(valor * 100);
+            const base = Math.trunc(totalCentavos / qtd);
+            const resto = totalCentavos - base * qtd;
+            const partes = [];
+            for (let i = 0; i < qtd; i++) {
+                const extra = i < Math.abs(resto) ? Math.sign(resto) : 0;
+                partes.push((base + extra) / 100);
+            }
+            return partes;
+        }
+
+        function atualizarDashboard() {
+            const [ano, mes] = mesAtual.split("-").map(Number);
+            document.getElementById("tituloFatura").innerText = `Fatura de ${NOMES_MESES[mes - 1]} / ${ano}`;
+            document.getElementById("badgeMes").innerText = NOMES_MESES[mes - 1];
+            renderizarTabela();
+            calcularResumos();
+        }
+
+        function renderizarTabela() {
+            const tbody = document.getElementById("tabelaLancamentosBody");
+            tbody.innerHTML = "";
+
+            if (lancamentos.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-stone-400">Nenhum lançamento cadastrado neste mês.</td></tr>`;
+                return;
+            }
+
+            lancamentos.forEach((item) => {
+                const tr = document.createElement("tr");
+                tr.className = "hover:bg-stone-50/80 transition";
+
+                const qtd = item.pagantes.length;
+                const parte = qtd > 0 ? item.valor / qtd : 0;
+
+                let html = `<td class="py-3 px-3 font-semibold text-stone-800">
+                    ${escaparHtml(item.desc)}
+                    ${item.data ? `<span class="block text-[10px] text-stone-400 font-medium">${escaparHtml(item.data)}</span>` : ""}
+                </td>`;
+
+                html += `<td class="py-3 px-3 font-bold text-stone-900">
+                    ${formatarMoeda(item.valor)}
+                    ${qtd > 1 ? `<span class="block text-[10px] text-stone-400 font-medium">${formatarMoeda(parte)} c/ (÷${qtd})</span>` : ""}
+                </td>`;
+
+                html += `<td class="py-3 px-3"><div class="flex flex-wrap gap-1.5">`;
+                pessoas.forEach((p, idx) => {
+                    const ativo = item.pagantes.includes(p);
+                    html += `
+                        <button onclick="togglePagante(${item.id}, ${idx})" class="px-2.5 py-1 rounded-xl text-[11px] font-semibold transition border ${
+                            ativo
+                            ? 'bg-amberSoft-500 text-white border-amberSoft-600 shadow-sm'
+                            : 'bg-white text-stone-500 border-stone-200 hover:border-stone-400'
+                        }">
+                            ${escaparHtml(p)} ${ativo ? '<i class="fa-solid fa-check ml-1 text-[9px]"></i>' : ''}
+                        </button>`;
+                });
+                html += `</div></td>`;
+
+                html += `<td class="py-3 px-3 text-right">
+                    <button onclick="removerItem(${item.id})" class="text-stone-400 hover:text-red-600 p-1.5 transition rounded-lg hover:bg-red-50" title="Excluir item">
+                        <i class="fa-regular fa-trash-can"></i>
+                    </button>
+                </td>`;
+
+                tr.innerHTML = html;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function togglePagante(id, idxPessoa) {
+            const item = lancamentos.find(l => l.id === id);
+            const pessoa = pessoas[idxPessoa];
+            if (!item || !pessoa) return;
+
+            const index = item.pagantes.indexOf(pessoa);
+            if (index > -1) {
+                if (item.pagantes.length === 1) {
+                    alert("O item precisa ter pelo menos um pagante selecionado.");
+                    return;
+                }
+                item.pagantes.splice(index, 1);
+            } else {
+                item.pagantes.push(pessoa);
+                // Mantém a mesma ordem da lista de pessoas
+                item.pagantes.sort((a, b) => pessoas.indexOf(a) - pessoas.indexOf(b));
+            }
+
+            salvarLocalStorage();
+            atualizarDashboard();
+        }
+
+        function removerItem(id) {
+            lancamentos = lancamentos.filter(l => l.id !== id);
+            salvarLocalStorage();
+            atualizarDashboard();
+        }
+
+        function calcularResumos() {
+            let totalCentavos = 0;
+            const totaisPorPessoa = {};
+            const itensPorPessoa = {};
+            pessoas.forEach(p => { totaisPorPessoa[p] = 0; itensPorPessoa[p] = []; });
+
+            lancamentos.forEach(item => {
+                totalCentavos += Math.round(item.valor * 100);
+                const pagantesItem = item.pagantes.filter(p => p in totaisPorPessoa);
+                if (pagantesItem.length === 0) return;
+
+                const partes = dividirValor(item.valor, pagantesItem.length);
+                pagantesItem.forEach((p, i) => {
+                    totaisPorPessoa[p] += partes[i];
+                    itensPorPessoa[p].push({ desc: item.desc, valor: partes[i] });
+                });
+            });
+
+            document.getElementById("headerTotalFatura").innerText = formatarMoeda(totalCentavos / 100);
+            document.getElementById("qtdParticipantes").innerText = `${pessoas.length} Pessoas`;
+
+            // Cards de métricas no topo
+            const metricas = document.getElementById("metricasContainer");
+            metricas.innerHTML = pessoas.map(p => `
+                <div class="bento-card p-4 rounded-3xl flex flex-col justify-between">
+                    <span class="text-xs text-stone-500 font-semibold">${escaparHtml(p)}</span>
+                    <div class="my-2">
+                        <h3 class="text-xl font-bold text-stone-900">${formatarMoeda(totaisPorPessoa[p])}</h3>
+                    </div>
+                    <span class="text-[10px] text-stone-400 font-medium bg-stone-100 px-2 py-0.5 rounded-md w-max">Rateio Automático</span>
+                </div>`).join("");
+
+            // Resumo detalhado
+            const resumoContainer = document.getElementById("resumoPessoasContainer");
+            let resumoHtml = "";
+            pessoas.forEach(p => {
+                const listaItens = itensPorPessoa[p];
+                resumoHtml += `
+                    <div class="bg-white/5 border border-white/10 p-4 rounded-2xl space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-cream-50 text-sm flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-amberSoft-500"></span> ${escaparHtml(p)}
+                            </span>
+                            <span class="font-bold text-amber-300 text-sm">${formatarMoeda(totaisPorPessoa[p])}</span>
+                        </div>`;
+
+                if (listaItens.length > 0) {
+                    resumoHtml += `<div class="text-[11px] text-stone-400 space-y-1 pt-2 border-t border-white/5 max-h-24 overflow-y-auto">`;
+                    listaItens.forEach(i => {
+                        resumoHtml += `<div class="flex justify-between gap-2"><span>• ${escaparHtml(i.desc)}</span> <span class="text-stone-300 whitespace-nowrap">${formatarMoeda(i.valor)}</span></div>`;
+                    });
+                    resumoHtml += `</div>`;
+                } else {
+                    resumoHtml += `<p class="text-[11px] text-stone-500 pt-1">Nenhum gasto atribuído.</p>`;
+                }
+                resumoHtml += `</div>`;
+            });
+            resumoContainer.innerHTML = resumoHtml;
+        }
+
+        // ---------- Navegação entre meses ----------
+
+        async function carregarMes(mes) {
+            mesAtual = mes;
+            const origem = document.getElementById("origemDados");
+
+            // 1) Edições salvas neste navegador têm prioridade
+            const salvo = lerLocalStorage(mes);
+            if (salvo) {
+                lancamentos = normalizarLancamentos(salvo);
+                origem.innerText = "Salvo neste navegador";
+                atualizarDashboard();
+                return;
+            }
+
+            // 2) Arquivo gerado pelo bot e publicado no site (data/faturas/AAAA-MM.json)
+            lancamentos = [];
+            origem.innerText = "Mês novo (zerado)";
+            atualizarDashboard();
+            try {
+                const resp = await fetch(`data/faturas/${mes}.json`, { cache: "no-store" });
+                if (resp.ok && mesAtual === mes) {
+                    const dados = await resp.json();
+                    lancamentos = normalizarLancamentos(Array.isArray(dados) ? dados : (dados.lancamentos || []));
+                    origem.innerText = "Carregado da fatura publicada pelo bot";
+                    atualizarDashboard();
+                }
+            } catch (e) {
+                // Sem arquivo para o mês: segue zerado
+            }
+        }
+
+        function mudarMes(delta) {
+            const [ano, mes] = mesAtual.split("-").map(Number);
+            const d = new Date(ano, mes - 1 + delta, 1);
+            carregarMes(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+        }
+
+        function zerarMes() {
+            if (confirm("Deseja apagar todos os lançamentos deste mês?")) {
+                lancamentos = [];
+                salvarLocalStorage();
+                document.getElementById("origemDados").innerText = "Salvo neste navegador";
+                atualizarDashboard();
+            }
+        }
+
+        function exportarJSON() {
+            const conteudo = JSON.stringify({ mes: mesAtual, lancamentos }, null, 2);
+            const blob = new Blob([conteudo], { type: "application/json" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `${mesAtual}.json`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        // ---------- Modal de importação JSON ----------
+
+        function abrirModalImportarJSON() {
+            document.getElementById("modalImportarJSON").classList.remove("hidden");
+        }
+
+        function fecharModalImportarJSON() {
+            document.getElementById("modalImportarJSON").classList.add("hidden");
+            document.getElementById("inputJSON").value = "";
+            document.getElementById("inputArquivoJSON").value = "";
+        }
+
+        document.getElementById("inputArquivoJSON").addEventListener("change", async (e) => {
+            const arquivo = e.target.files[0];
+            if (arquivo) document.getElementById("inputJSON").value = await arquivo.text();
+        });
+
+        function processarImportacaoJSON() {
+            const rawJson = document.getElementById("inputJSON").value.trim();
+            if (!rawJson) {
+                alert("Cole o código JSON com os lançamentos da fatura.");
+                return;
+            }
+
+            try {
+                const dados = JSON.parse(rawJson);
+                const lista = Array.isArray(dados) ? dados : dados.lancamentos;
+                if (!Array.isArray(lista)) {
+                    throw new Error("O JSON precisa ser uma lista de lançamentos ou um objeto com \"lancamentos\".");
+                }
+
+                // Se o JSON informa o mês, importa direto nele
+                if (!Array.isArray(dados) && /^\d{4}-\d{2}$/.test(dados.mes || "")) {
+                    mesAtual = dados.mes;
+                }
+
+                lancamentos = normalizarLancamentos(lista);
+                salvarLocalStorage();
+                document.getElementById("origemDados").innerText = "Salvo neste navegador";
+                atualizarDashboard();
+                fecharModalImportarJSON();
+                alert(`${lancamentos.length} lançamentos importados com sucesso!`);
+            } catch (err) {
+                alert("Erro ao ler o JSON: " + err.message);
+            }
+        }
+
+        // ---------- Modal de novo item ----------
+
+        function abrirModalNovoItem() {
+            document.getElementById("checkboxesPessoas").innerHTML = pessoas.map(p => `
+                <label class="flex items-center gap-2 bg-white border border-stone-200 p-2.5 rounded-2xl cursor-pointer hover:border-amberSoft-500">
+                    <input type="checkbox" name="pessoasCheck" value="${escaparHtml(p)}" checked class="accent-amber-600 rounded">
+                    <span class="text-xs font-medium text-stone-800">${escaparHtml(p)}</span>
+                </label>`).join("");
+            document.getElementById("modalNovoItem").classList.remove("hidden");
+        }
+
+        function fecharModalNovoItem() {
+            document.getElementById("modalNovoItem").classList.add("hidden");
+            document.getElementById("formNovoItem").reset();
+        }
+
+        function adicionarItem(event) {
+            event.preventDefault();
+            const desc = document.getElementById("inputDesc").value.trim();
+            const valor = paraNumero(document.getElementById("inputValor").value);
+
+            const checkboxes = document.querySelectorAll('input[name="pessoasCheck"]:checked');
+            const pagantes = Array.from(checkboxes).map(cb => cb.value);
+
+            if (pagantes.length === 0) {
+                alert("Selecione pelo menos uma pessoa para participar do lançamento.");
+                return;
+            }
+
+            const novoId = lancamentos.length > 0 ? Math.max(...lancamentos.map(l => l.id)) + 1 : 1;
+            lancamentos.push({ id: novoId, data: "", desc, valor, pagantes });
+
+            salvarLocalStorage();
+            document.getElementById("origemDados").innerText = "Salvo neste navegador";
+            atualizarDashboard();
+            fecharModalNovoItem();
+        }
+
+        // ---------- Inicialização ----------
+
+        window.onload = async function() {
+            const hora = new Date().getHours();
+            document.getElementById("saudacao").innerText = hora < 12 ? "Bom dia" : hora < 18 ? "Boa tarde" : "Boa noite";
+
+            try {
+                const resp = await fetch("data/config.json", { cache: "no-store" });
+                if (resp.ok) {
+                    const config = await resp.json();
+                    if (Array.isArray(config.pessoas) && config.pessoas.length > 0) pessoas = config.pessoas;
+                }
+            } catch (e) {
+                // Sem config: usa a lista padrão
+            }
+
+            // Remove dados da versão antiga (uma única fatura para todos os meses, com Izabel)
+            try { localStorage.removeItem("fatura_lancamentos"); } catch (e) {}
+
+            await carregarMes(mesDeHoje());
+        };
+    </script>
+</body>
+</html>

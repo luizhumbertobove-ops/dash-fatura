@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+# Faturas originais (PDF/CSV) nunca devem ir para o repositório
+faturas_originais/
+*.pdf
